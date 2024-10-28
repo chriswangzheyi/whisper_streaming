@@ -187,22 +187,29 @@ class OpenaiApiASR(ASRBase):
         if self.use_vad_opt:
             for segment in segments.segments:
                 # TODO: threshold can be set from outside
-                if segment["no_speech_prob"] > 0.8:
+                if segment.get("no_speech_prob", 0) > 0.8:
                     no_speech_segments.append((segment.get("start"), segment.get("end")))
 
         o = []
         for word in segments.words:
             start = word.get("start")
             end = word.get("end")
-            if any(s[0] <= start <= s[1] for s in no_speech_segments):
-                # print("Skipping word", word.get("word"), "because it's in a no-speech segment")
+            word_text = word.get("word")
+
+            if start is None or end is None or word_text is None:
+                print(f"Skipping due to missing attributes: start={start}, end={end}, word={word_text}")
                 continue
-            o.append((start, end, word.get("word")))
+
+            if any(s[0] <= start <= s[1] for s in no_speech_segments):
+                # print("Skipping word", word_text, "because it's in a no-speech segment")
+                continue
+
+            o.append((start, end, word_text))
+
         return o
 
-
     def segments_end_ts(self, res):
-        return [s["end"] for s in res.words]
+        return [s.get("end") for s in res.words if "end" in s]
 
     def transcribe(self, audio_data, prompt=None, *args, **kwargs):
         # Write the audio data to a buffer
